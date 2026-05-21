@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sentinelle Numérique — Accès Sécurisé</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:      #030810;
+      --panel:   #0a1628;
+      --border:  #0e3a5e;
+      --accent:  #00d4ff;
+      --danger:  #ff3c5a;
+      --text:    #c8e0f4;
+      --dim:     #3d6a8a;
+      --mono:    'Share Tech Mono', monospace;
+      --display: 'Exo 2', sans-serif;
+      --sans:    'Rajdhani', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--sans);
+      overflow: hidden;
+    }
+
+    /* Animated grid bg */
+    .bg-grid {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: grid-move 20s linear infinite;
+    }
+    @keyframes grid-move {
+      0%   { background-position: 0 0; }
+      100% { background-position: 40px 40px; }
+    }
+
+    /* Glow orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: .15;
+      pointer-events: none;
+    }
+    .orb1 { width: 400px; height: 400px; background: #00d4ff; top: -100px; left: -100px; }
+    .orb2 { width: 300px; height: 300px; background: #0044aa; bottom: -80px; right: -80px; }
+
+    /* scanlines */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,212,255,0.015) 2px, rgba(0,212,255,0.015) 4px
+      );
+      pointer-events: none;
+    }
+
+    .login-box {
+      position: relative; z-index: 10;
+      background: rgba(10,22,40,0.92);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2.5rem 2.8rem;
+      width: 100%; max-width: 420px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 0 60px rgba(0,212,255,0.08);
+    }
+    .login-box::before {
+      content: '';
+      position: absolute; top: 0; left: 10%; right: 10%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .login-logo {
+      text-align: center; margin-bottom: 2rem;
+    }
+    .login-logo .icon {
+      width: 54px; height: 54px;
+      border: 2px solid var(--accent);
+      border-radius: 10px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-family: var(--mono); font-size: 20px; color: var(--accent);
+      box-shadow: 0 0 20px rgba(0,212,255,0.25);
+      margin-bottom: 12px;
+      animation: pulse 3s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 20px rgba(0,212,255,0.25); }
+      50%      { box-shadow: 0 0 35px rgba(0,212,255,0.5); }
+    }
+    .login-logo h1 {
+      font-family: var(--display);
+      font-weight: 800; font-size: 22px;
+      color: var(--accent); letter-spacing: 2px;
+    }
+    .login-logo p {
+      font-family: var(--mono); font-size: 10px;
+      color: var(--dim); letter-spacing: 3px;
+      text-transform: uppercase; margin-top: 4px;
+    }
+
+    .form-group { margin-bottom: 1.2rem; }
+    .form-group label {
+      display: block;
+      font-family: var(--mono); font-size: 10px;
+      letter-spacing: 2px; text-transform: uppercase;
+      color: var(--dim); margin-bottom: 7px;
+    }
+    .form-control {
+      width: 100%;
+      background: rgba(3,8,16,0.8);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono); font-size: 13px;
+      padding: 11px 14px; border-radius: 5px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .form-control:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0,212,255,0.12);
+    }
+    .form-control::placeholder { color: #2a4a62; }
+
+    .btn-login {
+      width: 100%; padding: 12px;
+      background: linear-gradient(90deg, rgba(0,212,255,0.12), rgba(0,136,204,0.12));
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--sans); font-weight: 700;
+      font-size: 14px; letter-spacing: 3px; text-transform: uppercase;
+      border-radius: 5px; cursor: pointer;
+      transition: all .2s;
+      margin-top: .5rem;
+    }
+    .btn-login:hover {
+      background: rgba(0,212,255,0.2);
+      box-shadow: 0 0 20px rgba(0,212,255,0.3);
+    }
+
+    .alert-error {
+      background: rgba(255,60,90,0.1);
+      border: 1px solid rgba(255,60,90,0.4);
+      border-left: 3px solid var(--danger);
+      color: #ff8a9a;
+      font-family: var(--mono); font-size: 12px;
+      padding: 10px 14px; border-radius: 4px;
+      margin-bottom: 1.2rem;
+    }
+
+    .login-footer {
+      text-align: center; margin-top: 1.5rem;
+      font-family: var(--mono); font-size: 10px;
+      color: var(--dim); letter-spacing: 1px;
+    }
+    .divider {
+      border: none; border-top: 1px solid rgba(14,58,94,0.5);
+      margin: 1.5rem 0;
+    }
+    .typing-text {
+      font-family: var(--mono); font-size: 11px;
+      color: var(--dim); text-align: center;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="login-box">
+  <div class="login-logo">
+    <div class="icon">SN</div>
+    <h1>SENTINELLE</h1>
+    <p>Numérique · Deepfake Détection</p>
+  </div>
+
+  <div class="typing-text" id="typing"></div>
+  <hr class="divider"/>
+
+  {% if error %}
+  <div class="alert-error">⚠ {{ error }}</div>
+  {% endif %}
+
+  <form method="POST">
+    <div class="form-group">
+      <label>Identifiant</label>
+      <input type="text" name="username" class="form-control" placeholder="admin" autocomplete="off" required/>
+    </div>
+    <div class="form-group">
+      <label>Mot de passe</label>
+      <input type="password" name="password" class="form-control" placeholder="••••••••" required/>
+    </div>
+    <button type="submit" class="btn-login">Accès Système</button>
+  </form>
+
+  <div class="login-footer">
+    SUP'PTIC · ITT3 IR Alternance 2024/2025<br/>
+    Groupe 2 — Spécialiste Deepfake Vidéo
+  </div>
+</div>
+
+<script>
+  const messages = [
+    "Initialisation du système de détection...",
+    "Chargement des modèles IA...",
+    "Analyse biométrique en attente...",
+    "Système prêt. Authentification requise."
+  ];
+  let i = 0, ci = 0;
+  const el = document.getElementById('typing');
+  function typeMsg() {
+    if (i >= messages.length) { i = messages.length - 1; return; }
+    if (ci < messages[i].length) {
+      el.textContent = messages[i].substring(0, ++ci) + '█';
+      setTimeout(typeMsg, 35);
+    } else {
+      setTimeout(() => { i++; ci = 0; typeMsg(); }, 900);
+    }
+  }
+  typeMsg();
+</script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Analyse URL — Sentinelle Numérique{% endblock %}
+
+{% block extra_css %}
+<style>
+  .platform-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+  .platform-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 14px; text-align: center;
+    cursor: pointer; transition: all .2s;
+  }
+  .platform-card:hover, .platform-card.selected {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.07);
+  }
+  .platform-card .picon { font-size: 24px; margin-bottom: 6px; }
+  .platform-card .pname {
+    font-family: var(--sans); font-weight: 600; font-size: 12px; color: var(--text);
+  }
+  .platform-card .pstatus {
+    font-family: var(--mono); font-size: 9px;
+    color: var(--safe); margin-top: 3px;
+  }
+
+  .url-wrapper {
+    position: relative;
+  }
+  .url-wrapper .url-prefix {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+    pointer-events: none;
+  }
+  .url-input {
+    padding-left: 58px !important;
+  }
+
+  .warning-box {
+    background: rgba(255,170,0,0.07);
+    border: 1px solid rgba(255,170,0,0.25);
+    border-left: 3px solid var(--warn);
+    border-radius: 4px; padding: 12px 14px;
+    font-family: var(--mono); font-size: 11px;
+    color: #c8a050; line-height: 1.6;
+    margin-bottom: 1.2rem;
+  }
+
+  .progress-bar { display: none; margin-top: 1.5rem; }
+  .progress-bar .bar { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+  .progress-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    width: 0%; border-radius: 2px;
+    animation: progress-url 8s ease-in-out forwards;
+  }
+  @keyframes progress-url { 0%{width:0%} 70%{width:75%} 100%{width:88%} }
+  .progress-bar p { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 6px; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Analyse <span>URL</span></h1>
+  <p>// Téléchargement et analyse de vidéos depuis TikTok, YouTube Shorts, Instagram Reels</p>
+</div>
+
+<div class="grid-2">
+  <div>
+    {% if error %}
+    <div class="alert alert-danger">⚠ {{ error }}</div>
+    {% endif %}
+
+    <div class="panel">
+      <div class="panel-title">Plateformes Supportées</div>
+      <div class="platform-grid">
+        <div class="platform-card">
+          <div class="picon">🎵</div>
+          <div class="pname">TikTok</div>
+          <div class="pstatus">● Supporté</div>
+        </div>
+        <div class="platform-card">
+          <div class="picon">▶</div>
+          <div class="pname">YouTube Shorts</div>
+          <div class="pstatus">● Supporté</div>
+        </div>
+        <div class="platform-card">
+          <div class="picon">📸</div>
+          <div class="pname">Instagram Reels</div>
+          <div class="pstatus">● Supporté</div>
+        </div>
+      </div>
+
+      <div class="warning-box">
+        ⚠ Assurez-vous que yt-dlp est installé :<br/>
+        <code style="color:var(--accent);">pip install yt-dlp</code><br/>
+        Le téléchargement peut prendre jusqu'à 60 secondes selon la connexion.
+      </div>
+
+      <form method="POST" id="url-form">
+        <div class="form-group">
+          <label>URL de la vidéo</label>
+          <div class="url-wrapper">
+            <span class="url-prefix">https://</span>
+            <input type="url" name="url" class="form-control url-input"
+                   placeholder="tiktok.com/@user/video/..."
+                   id="url-input" required/>
+          </div>
+        </div>
+
+        <div class="progress-bar" id="progress">
+          <div class="bar"><div class="fill"></div></div>
+          <p id="progress-msg">Téléchargement de la vidéo...</p>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:1rem;">
+          <button type="submit" class="btn" id="submit-btn">⬡ Télécharger & Analyser</button>
+          <a href="{{ url_for('dashboard') }}" class="btn btn-danger">✕ Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:1.5rem;">
+    <div class="panel">
+      <div class="panel-title">Processus d'Analyse URL</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        {% for step, title, desc in [
+          ("01", "Téléchargement", "yt-dlp récupère la vidéo depuis la plateforme en format MP4."),
+          ("02", "Stockage temporaire", "La vidéo est sauvegardée localement dans static/uploads/."),
+          ("03", "Analyse frame-à-frame", "Le moteur IA analyse chaque frame selon les 3 indices deepfake."),
+          ("04", "Rapport & Historique", "Le résultat est enregistré dans la base SQLite et affiché.")
+        ] %}
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:bold;flex-shrink:0;padding-top:2px;">{{ step }}</div>
+          <div>
+            <div style="font-family:var(--sans);font-weight:600;font-size:13px;color:var(--text);">{{ title }}</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:2px;">{{ desc }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Exemples d'URL</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        {% for label, url_ex in [
+          ("TikTok", "https://www.tiktok.com/@user/video/1234567"),
+          ("YouTube Shorts", "https://youtube.com/shorts/abcdefg"),
+          ("Instagram Reels", "https://www.instagram.com/reels/abcXYZ/")
+        ] %}
+        <div style="padding:8px 12px;background:var(--bg2);border-radius:4px;cursor:pointer;"
+             onclick="document.getElementById('url-input').value='{{ url_ex }}'">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">{{ label }}</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:2px;">{{ url_ex }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const msgs = [
+    "Téléchargement de la vidéo...",
+    "Connexion à la plateforme...",
+    "Extraction du flux vidéo MP4...",
+    "Analyse des frames en cours...",
+    "Détection des artefacts deepfake...",
+    "Calcul du score final..."
+  ];
+  let idx = 0;
+  const form = document.getElementById('url-form');
+  form.addEventListener('submit', () => {
+    document.getElementById('progress').style.display = 'block';
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('submit-btn').textContent = '⏳ Traitement...';
+    setInterval(() => {
+      idx = (idx + 1) % msgs.length;
+      document.getElementById('progress-msg').textContent = msgs[idx];
+    }, 2500);
+  });
+</script>
+{% endblock %}

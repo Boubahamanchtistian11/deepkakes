@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Analyse Vidéo — Sentinelle Numérique{% endblock %}
+
+{% block extra_css %}
+<style>
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all .3s;
+    background: var(--bg2);
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.05);
+    box-shadow: inset 0 0 30px rgba(0,212,255,0.05);
+  }
+  .drop-zone .icon {
+    font-size: 48px; margin-bottom: 12px; display: block;
+    filter: grayscale(.6); transition: filter .3s;
+  }
+  .drop-zone:hover .icon { filter: grayscale(0); }
+  .drop-zone h3 {
+    font-family: var(--display); font-weight: 700; font-size: 18px;
+    color: var(--text); margin-bottom: 8px;
+  }
+  .drop-zone p {
+    font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+  .file-selected {
+    display: none;
+    margin-top: 1rem; padding: 12px 16px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 5px;
+    font-family: var(--mono); font-size: 12px;
+    color: var(--accent);
+  }
+
+  .info-row {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 1.5rem;
+  }
+  .info-chip {
+    padding: 5px 12px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 20px;
+    font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  }
+  .info-chip span { color: var(--accent); }
+
+  .progress-bar { display: none; margin-top: 1.5rem; }
+  .progress-bar .bar {
+    height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden;
+  }
+  .progress-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    width: 0%; border-radius: 2px;
+    animation: progress-anim 3s ease-in-out forwards;
+  }
+  @keyframes progress-anim { 0%{width:0%} 80%{width:85%} 100%{width:90%} }
+  .progress-bar p {
+    font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+    margin-top: 6px; text-align: center;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Analyse <span>Vidéo</span></h1>
+  <p>// Upload d'un fichier vidéo local pour détection deepfake</p>
+</div>
+
+<div class="grid-2">
+  <div>
+    {% if error %}
+    <div class="alert alert-danger">⚠ {{ error }}</div>
+    {% endif %}
+
+    <div class="panel">
+      <div class="panel-title">Importer une Vidéo</div>
+      <form method="POST" enctype="multipart/form-data" id="upload-form">
+        <div class="drop-zone" id="drop-zone">
+          <span class="icon">🎬</span>
+          <h3>Glisser-déposer ou cliquer</h3>
+          <p>Formats acceptés : MP4, AVI, MOV, MKV · Max recommandé : 50 Mo</p>
+          <input type="file" name="file" id="file-input" accept=".mp4,.avi,.mov,.mkv" required/>
+        </div>
+        <div class="file-selected" id="file-info">📎 Fichier sélectionné : <span id="file-name"></span></div>
+
+        <div class="progress-bar" id="progress">
+          <div class="bar"><div class="fill"></div></div>
+          <p id="progress-msg">Analyse en cours... Veuillez patienter.</p>
+        </div>
+
+        <div style="margin-top:1.5rem;display:flex;gap:10px;">
+          <button type="submit" class="btn" id="submit-btn">▶ Lancer l'Analyse</button>
+          <a href="{{ url_for('dashboard') }}" class="btn btn-danger">✕ Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:1.5rem;">
+    <div class="panel">
+      <div class="panel-title">Comment ça fonctionne</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        {% for step, title, desc in [
+          ("01", "Extraction des frames", "La vidéo est décomposée en images à raison de 5 fps pour analyse."),
+          ("02", "Analyse IA par frame", "Chaque frame passe par le modèle de détection deepfake (224×224px)."),
+          ("03", "Détection des indices", "Micro-clignements, désynchronisation labiale, artefacts GAN."),
+          ("04", "Verdict global", "Score moyen calculé. Seuil de décision : 50% de score deepfake.")
+        ] %}
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:bold;flex-shrink:0;padding-top:2px;">{{ step }}</div>
+          <div>
+            <div style="font-family:var(--sans);font-weight:600;font-size:13px;color:var(--text);">{{ title }}</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:2px;">{{ desc }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Formats Supportés</div>
+      <div class="info-row">
+        <span class="info-chip"><span>MP4</span> H.264/H.265</span>
+        <span class="info-chip"><span>AVI</span> MPEG-4</span>
+        <span class="info-chip"><span>MOV</span> QuickTime</span>
+        <span class="info-chip"><span>MKV</span> Matroska</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);line-height:1.7;">
+        ⚠ Les vidéos très longues (&gt;10 min) peuvent prendre plusieurs minutes à analyser.<br/>
+        ⚡ Taux d'échantillonnage : 5 frames/seconde pour équilibre vitesse/précision.
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const fileInput = document.getElementById('file-input');
+  const fileInfo  = document.getElementById('file-info');
+  const fileName  = document.getElementById('file-name');
+  const form      = document.getElementById('upload-form');
+  const progress  = document.getElementById('progress');
+  const submitBtn = document.getElementById('submit-btn');
+  const dropZone  = document.getElementById('drop-zone');
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) {
+      fileName.textContent = fileInput.files[0].name;
+      fileInfo.style.display = 'block';
+    }
+  });
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      fileName.textContent = e.dataTransfer.files[0].name;
+      fileInfo.style.display = 'block';
+    }
+  });
+
+  const msgs = [
+    "Extraction des frames en cours...",
+    "Analyse IA des frames...",
+    "Détection des micro-clignements...",
+    "Vérification synchronisation labiale...",
+    "Calcul du score global..."
+  ];
+  let msgIdx = 0;
+  form.addEventListener('submit', () => {
+    progress.style.display = 'block';
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Analyse en cours...';
+    const el = document.getElementById('progress-msg');
+    setInterval(() => {
+      msgIdx = (msgIdx + 1) % msgs.length;
+      el.textContent = msgs[msgIdx];
+    }, 1800);
+  });
+</script>
+{% endblock %}

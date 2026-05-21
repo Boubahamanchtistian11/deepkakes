@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Sentinelle Numérique{% endblock %}
+
+{% block extra_css %}
+<style>
+  .stat-card { transition: transform .2s; }
+  .stat-card:hover { transform: translateY(-3px); }
+
+  .score-bar {
+    height: 6px; background: var(--bg2);
+    border-radius: 3px; overflow: hidden; margin-top: 8px;
+  }
+  .score-bar-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    transition: width 1.2s ease;
+  }
+
+  .activity-dot {
+    display: inline-block;
+    width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 6px;
+  }
+  .dot-fake { background: var(--danger); box-shadow: 0 0 4px var(--danger); }
+  .dot-real { background: var(--safe);   box-shadow: 0 0 4px var(--safe); }
+
+  .hero-banner {
+    background: linear-gradient(135deg, var(--bg3) 0%, #071832 100%);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    position: relative; overflow: hidden;
+  }
+  .hero-banner::after {
+    content: 'DEEPFAKE DETECTION';
+    position: absolute; right: -20px; top: 50%;
+    transform: translateY(-50%) rotate(90deg);
+    font-family: var(--mono); font-size: 10px;
+    color: rgba(0,212,255,0.07); letter-spacing: 6px;
+    white-space: nowrap;
+  }
+  .hero-banner h2 {
+    font-family: var(--display); font-weight: 800; font-size: 24px;
+    color: var(--text);
+  }
+  .hero-banner h2 span { color: var(--accent); }
+  .hero-banner p {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-dim); margin-top: 6px; line-height: 1.6;
+  }
+  .hero-actions { display: flex; gap: 10px; flex-shrink: 0; }
+
+  .status-indicator {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-dim); margin-top: 10px;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--safe); box-shadow: 0 0 6px var(--safe);
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:.4} }
+
+  .pct-circle {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--display); font-weight: 800; font-size: 18px;
+    color: var(--accent);
+    position: relative;
+    box-shadow: inset 0 0 14px rgba(0,212,255,0.08);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Banner -->
+<div class="hero-banner">
+  <div>
+    <h2>Système <span>Actif</span> — Surveillance en Cours</h2>
+    <p>
+      Moteur d'analyse deepfake · Détection micro-clignements oculaires<br/>
+      Synchronisation labiale · Artefacts visuels GAN
+    </p>
+    <div class="status-indicator">
+      <div class="status-dot"></div>
+      Groupe 2 · SUP'PTIC ITT3 IR Alternance 2024/2025
+    </div>
+  </div>
+  <div class="hero-actions">
+    <a href="{{ url_for('analyse_video_route') }}" class="btn">▶ Analyser Vidéo</a>
+    <a href="{{ url_for('analyse_url_route') }}" class="btn">⬡ Analyser URL</a>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="grid-4" style="margin-bottom: 2rem;">
+  <div class="stat-card">
+    <div class="stat-val">{{ stats.total }}</div>
+    <div class="stat-label">Analyses Total</div>
+  </div>
+  <div class="stat-card danger">
+    <div class="stat-val">{{ stats.fakes }}</div>
+    <div class="stat-label">Deepfakes Détectés</div>
+  </div>
+  <div class="stat-card safe">
+    <div class="stat-val">{{ stats.reels }}</div>
+    <div class="stat-label">Vidéos Authentiques</div>
+  </div>
+  <div class="stat-card warn">
+    <div class="stat-val">{{ stats.avg_score }}%</div>
+    <div class="stat-label">Score Moyen</div>
+    <div class="score-bar">
+      <div class="score-bar-fill" style="width:{{ stats.avg_score }}%"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Content grid -->
+<div class="grid-2">
+  <!-- Recent analyses -->
+  <div class="panel">
+    <div class="panel-title">Analyses Récentes</div>
+    {% if historique %}
+    <table>
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Type</th>
+          <th>Score</th>
+          <th>Verdict</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in historique %}
+        <tr>
+          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11px;color:var(--text-dim)">
+            {{ row[2] }}
+          </td>
+          <td>
+            <span style="font-family:var(--mono);font-size:10px;background:rgba(0,212,255,0.1);color:var(--accent);padding:2px 7px;border-radius:3px;">
+              {{ row[1] }}
+            </span>
+          </td>
+          <td style="font-family:var(--mono);font-size:12px;">
+            {{ "%.0f"|format(row[3]*100) }}%
+          </td>
+          <td>
+            {% if row[4] == 'DEEPFAKE' %}
+              <span class="badge badge-fake">DEEPFAKE</span>
+            {% else %}
+              <span class="badge badge-real">AUTHENTIQUE</span>
+            {% endif %}
+          </td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">
+            {{ row[6] }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="font-family:var(--mono);font-size:12px;color:var(--text-dim);text-align:center;padding:2rem 0;">
+      Aucune analyse effectuée pour le moment.
+    </p>
+    {% endif %}
+    <div style="margin-top:1rem;text-align:right;">
+      <a href="{{ url_for('historique') }}" class="btn" style="font-size:11px;padding:7px 14px;">Voir tout →</a>
+    </div>
+  </div>
+
+  <!-- Info panel -->
+  <div style="display:flex;flex-direction:column;gap:1.5rem;">
+    <div class="panel">
+      <div class="panel-title">Indices Analysés</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        {% set indices = [
+          ("👁  Micro-clignements oculaires", "Détection des anomalies de fréquence et de durée du clignement (seuil : score > 0.55)"),
+          ("👄  Désynchronisation labiale", "Artefacts audio/vidéo sur séquences courtes (TikTok/Reels) — seuil : score > 0.65"),
+          ("🎞  Artefacts visuels GAN", "Incohérences de texture, flou périphérique, banding de compression (seuil : > 0.45)"),
+          ("📊  Analyse frame-à-frame", "Échantillonnage à 5 fps pour couverture complète sans surcharge")
+        ] %}
+        {% for titre, desc in indices %}
+        <div style="padding:10px 12px;background:var(--bg2);border-radius:5px;border-left:2px solid var(--accent2);">
+          <div style="font-family:var(--sans);font-weight:600;font-size:13px;color:var(--text);margin-bottom:3px;">{{ titre }}</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">{{ desc }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Actions Rapides</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <a href="{{ url_for('analyse_video_route') }}" class="btn">📁  Uploader une Vidéo</a>
+        <a href="{{ url_for('analyse_url_route') }}" class="btn">🔗  Analyser une URL (TikTok / Reels)</a>
+        <a href="{{ url_for('historique') }}" class="btn">📋  Consulter l'Historique</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

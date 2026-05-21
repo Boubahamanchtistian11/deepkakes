@@ -1,0 +1,2 @@
+# Ce fichier permet à Git de suivre le dossier uploads/ (vide par défaut).
+# Les vidéos uploadées sont ignorées via .gitignore.

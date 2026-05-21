@@ -1,0 +1,24 @@
+# ── Serveur Web ────────────────────────────────────────────────
+flask>=2.3.0
+werkzeug>=2.3.0
+
+# ── Analyse vidéo ───────────────────────────────────────────────
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# ── APIs externes ───────────────────────────────────────────────
+requests>=2.31.0          # Sightengine + HuggingFace
+
+# ── Variables d'environnement (.env) ───────────────────────────
+python-dotenv>=1.0.0
+
+# ── Téléchargement vidéo URL ────────────────────────────────────
+yt-dlp>=2024.1.0
+
+# ── Export PDF ──────────────────────────────────────────────────
+fpdf2>=2.7.0
+
+# ── Optionnel : modèle IA local (si pas d'API) ─────────────────
+# tensorflow>=2.13.0
+# transformers>=4.35.0
+# torch>=2.0.0

@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block title %}Résultat Analyse — Sentinelle Numérique{% endblock %}
+
+{% block extra_css %}
+<style>
+  .verdict-banner {
+    border-radius: 10px; padding: 2rem 2.5rem;
+    margin-bottom: 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    position: relative; overflow: hidden; border: 1px solid;
+  }
+  .verdict-banner.fake {
+    background: linear-gradient(135deg,rgba(255,60,90,.12),rgba(180,0,40,.08));
+    border-color: rgba(255,60,90,.4);
+  }
+  .verdict-banner.real {
+    background: linear-gradient(135deg,rgba(0,255,136,.08),rgba(0,120,60,.06));
+    border-color: rgba(0,255,136,.3);
+  }
+  .verdict-banner.fake::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg,transparent,var(--danger),transparent);
+  }
+  .verdict-banner.real::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg,transparent,var(--safe),transparent);
+  }
+  .verdict-icon { font-size:56px; animation: pop .5s ease-out; }
+  @keyframes pop { from{transform:scale(0) rotate(-15deg);opacity:0} to{transform:scale(1) rotate(0);opacity:1} }
+  .verdict-text h2 {
+    font-family:var(--display); font-weight:800; font-size:28px; letter-spacing:3px;
+  }
+  .verdict-banner.fake .verdict-text h2 { color: var(--danger); }
+  .verdict-banner.real .verdict-text h2 { color: var(--safe); }
+  .verdict-text p { font-family:var(--mono); font-size:12px; color:var(--text-dim); margin-top:6px; line-height:1.7; }
+
+  /* Gauge */
+  .gauge-wrap { display:flex; flex-direction:column; align-items:center; gap:8px; flex-shrink:0; }
+  .gauge-circle {
+    width:110px; height:110px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; position:relative;
+  }
+  .gauge-inner {
+    position:absolute; width:78px; height:78px; border-radius:50%;
+    background:var(--panel);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--display); font-weight:800; font-size:20px; z-index:1;
+  }
+  .fake .gauge-inner { color:var(--danger); }
+  .real .gauge-inner { color:var(--safe); }
+  .gauge-label { font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:1px; }
+
+  /* Score bars */
+  .score-row { margin-bottom:12px; }
+  .score-row-header {
+    display:flex; justify-content:space-between;
+    font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px;
+  }
+  .score-track { height:7px; background:var(--bg2); border-radius:4px; overflow:hidden; }
+  .score-fill { height:100%; border-radius:4px; width:0; transition: width 1.4s cubic-bezier(.4,0,.2,1); }
+  .score-fill.fake { background: linear-gradient(90deg,#aa0022,var(--danger)); }
+  .score-fill.real { background: linear-gradient(90deg,#006633,var(--safe)); }
+  .score-fill.se   { background: linear-gradient(90deg,#005588,#0099cc); }
+  .score-fill.hf   { background: linear-gradient(90deg,#664400,#cc8800); }
+
+  /* Detail cards */
+  .detail-item { background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:12px; }
+  .detail-label { font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
+  .detail-val   { font-family:var(--display); font-weight:700; font-size:19px; color:var(--accent); }
+
+  /* Indice cards */
+  .indice-card {
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:7px; padding:14px 16px;
+    display:flex; align-items:flex-start; gap:14px;
+  }
+  .indice-icon { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .icon-alert  { background:rgba(255,60,90,.15); border:1px solid rgba(255,60,90,.4); }
+  .icon-ok     { background:rgba(0,255,136,.10); border:1px solid rgba(0,255,136,.3); }
+  .indice-title { font-family:var(--sans); font-weight:600; font-size:13px; color:var(--text); }
+  .indice-desc  { font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-top:3px; line-height:1.5; }
+
+  /* Blockchain box */
+  .blockchain-box {
+    background:var(--bg2); border:1px solid rgba(0,212,255,.2);
+    border-left:3px solid var(--accent);
+    border-radius:6px; padding:14px 16px;
+    font-family:var(--mono); font-size:11px; color:var(--text-dim); line-height:1.8;
+  }
+  .blockchain-box .hash {
+    color:var(--accent); font-size:10px; word-break:break-all;
+    display:block; margin-top:6px;
+    background:rgba(0,212,255,.06); padding:6px 10px; border-radius:4px;
+  }
+
+  /* Export buttons */
+  .btn-export {
+    display:inline-flex; align-items:center; gap:7px;
+    font-family:var(--sans); font-weight:600; font-size:12px;
+    letter-spacing:1px; text-transform:uppercase;
+    padding:9px 18px; border-radius:4px; cursor:pointer;
+    text-decoration:none; transition:all .2s;
+  }
+  .btn-json {
+    border:1px solid #00cc66; background:rgba(0,204,102,.08); color:#00cc66;
+  }
+  .btn-json:hover { background:rgba(0,204,102,.18); box-shadow:0 0 12px rgba(0,204,102,.3); }
+  .btn-pdf {
+    border:1px solid #ff6633; background:rgba(255,102,51,.08); color:#ff6633;
+  }
+  .btn-pdf:hover { background:rgba(255,102,51,.18); box-shadow:0 0 12px rgba(255,102,51,.3); }
+
+  /* API badge */
+  .api-badge {
+    display:inline-flex; align-items:center; gap:5px;
+    font-family:var(--mono); font-size:10px;
+    padding:3px 9px; border-radius:3px;
+    background:rgba(0,212,255,.08); border:1px solid rgba(0,212,255,.2);
+    color:var(--accent);
+  }
+  .api-dot { width:6px; height:6px; border-radius:50%; background:var(--safe); box-shadow:0 0 4px var(--safe); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set is_fake = resultat.verdict == 'DEEPFAKE' %}
+{% set cls     = 'fake' if is_fake else 'real' %}
+{% set spct    = (resultat.score * 100) | round | int %}
+{% set d       = resultat.details %}
+{% set mpct    = (d.score_max_detecte * 100) | round | int %}
+{% set se_pct  = (d.score_sightengine * 100) | round | int %}
+{% set hf_pct  = (d.score_huggingface * 100) | round | int %}
+
+<!-- ── Bandeau Verdict ───────────────────────────────── -->
+<div class="verdict-banner {{ cls }}">
+  <div style="display:flex;align-items:center;gap:1.5rem;">
+    <div class="verdict-icon">{{ '⚠️' if is_fake else '✅' }}</div>
+    <div class="verdict-text">
+      <h2>{{ resultat.verdict }}</h2>
+      <p>
+        Analyse {{ type_analyse }} &nbsp;·&nbsp;
+        <code style="color:var(--accent)">{{ source[:55] }}{% if source|length > 55 %}…{% endif %}</code><br/>
+        {% if is_fake %}
+          Indices significatifs de manipulation artificielle détectés.
+        {% else %}
+          Aucun indice majeur de deepfake détecté dans cette vidéo.
+        {% endif %}
+      </p>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        <span class="api-badge"><span class="api-dot"></span> Sightengine</span>
+        <span class="api-badge"><span class="api-dot"></span> HuggingFace</span>
+        <span class="api-badge"><span class="api-dot"></span> SHA-256 Certifié</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Jauge circulaire CSS -->
+  <div class="gauge-wrap">
+    <div class="gauge-circle {{ cls }}"
+         style="background:conic-gradient({{ 'var(--danger)' if is_fake else 'var(--safe)' }} {{ spct * 3.6 }}deg, var(--bg3) 0deg);">
+      <div class="gauge-inner">{{ spct }}%</div>
+    </div>
+    <div class="gauge-label">SCORE DEEPFAKE</div>
+  </div>
+</div>
+
+<!-- ── Grille principale ─────────────────────────────── -->
+<div class="grid-2" style="margin-bottom:1.5rem;">
+
+  <!-- Scores détaillés -->
+  <div class="panel">
+    <div class="panel-title">Scores de Confiance</div>
+
+    <!-- Score global (fusionné) -->
+    <div class="score-row">
+      <div class="score-row-header"><span>Score global fusionné (60% SE + 40% HF)</span><span>{{ spct }}%</span></div>
+      <div class="score-track"><div class="score-fill {{ cls }}" data-w="{{ spct }}"></div></div>
+    </div>
+
+    <!-- Sightengine -->
+    <div class="score-row">
+      <div class="score-row-header">
+        <span style="color:#0099cc;">⬡ Sightengine API</span><span>{{ se_pct }}%</span>
+      </div>
+      <div class="score-track"><div class="score-fill se" data-w="{{ se_pct }}"></div></div>
+    </div>
+
+    <!-- HuggingFace -->
+    <div class="score-row">
+      <div class="score-row-header">
+        <span style="color:#cc8800;">⬡ HuggingFace (FaceForensics++)</span><span>{{ hf_pct }}%</span>
+      </div>
+      <div class="score-track"><div class="score-fill hf" data-w="{{ hf_pct }}"></div></div>
+    </div>
+
+    <!-- Score max -->
+    <div class="score-row">
+      <div class="score-row-header"><span>Score max détecté</span><span>{{ mpct }}%</span></div>
+      <div class="score-track"><div class="score-fill {{ cls }}" data-w="{{ mpct }}"></div></div>
+    </div>
+
+    <div style="padding:10px 14px;background:var(--bg2);border-radius:5px;
+                font-family:var(--mono);font-size:11px;color:var(--text-dim);line-height:1.7;margin-top:4px;">
+      ℹ Seuil décision&nbsp;: <span style="color:var(--accent)">50%</span>
+      &nbsp;·&nbsp; Score fusionné&nbsp;:
+      <strong style="color:{{ 'var(--danger)' if is_fake else 'var(--safe)' }}">{{ spct }}%</strong>
+    </div>
+  </div>
+
+  <!-- Stats vidéo -->
+  <div class="panel">
+    <div class="panel-title">Statistiques Vidéo</div>
+    <div class="grid-2" style="gap:10px;">
+      <div class="detail-item">
+        <div class="detail-label">Durée</div>
+        <div class="detail-val">{{ d.duree_secondes }}s</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">FPS</div>
+        <div class="detail-val">{{ d.fps }}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Frames totales</div>
+        <div class="detail-val">{{ d.total_frames }}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Frames analysées</div>
+        <div class="detail-val">{{ d.frames_analysees }}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Frames suspectes</div>
+        <div class="detail-val"
+             style="color:{{ 'var(--danger)' if d.frames_fake > 0 else 'var(--safe)' }}">
+          {{ d.frames_fake }}
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">% Suspect</div>
+        <div class="detail-val"
+          style="color:{% if d.pourcentage_fake > 50 %}var(--danger){% elif d.pourcentage_fake > 20 %}var(--warn){% else %}var(--safe){% endif %}">
+          {{ d.pourcentage_fake }}%
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Indices deepfake ──────────────────────────────── -->
+<div class="panel" style="margin-bottom:1.5rem;">
+  <div class="panel-title">Indices de Manipulation Analysés</div>
+  <div class="grid-3" style="gap:12px;">
+
+    <div class="indice-card">
+      <div class="indice-icon {{ 'icon-alert' if d.anomalie_yeux else 'icon-ok' }}">
+        {{ '⚠' if d.anomalie_yeux else '✓' }}
+      </div>
+      <div>
+        <div class="indice-title">Micro-clignements Oculaires</div>
+        <div class="indice-desc">
+          {% if d.anomalie_yeux %}
+            Fréquence / durée anormale détectée — score &gt; 55%
+          {% else %}
+            Clignements dans les normes biologiques
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="indice-card">
+      <div class="indice-icon {{ 'icon-alert' if d.desync_labiale else 'icon-ok' }}">
+        {{ '⚠' if d.desync_labiale else '✓' }}
+      </div>
+      <div>
+        <div class="indice-title">Désynchronisation Labiale</div>
+        <div class="indice-desc">
+          {% if d.desync_labiale %}
+            Artefacts audio/vidéo lip-sync — score &gt; 65%
+          {% else %}
+            Synchronisation lèvres/audio normale
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="indice-card">
+      <div class="indice-icon {{ 'icon-alert' if d.artefacts_visuels else 'icon-ok' }}">
+        {{ '⚠' if d.artefacts_visuels else '✓' }}
+      </div>
+      <div>
+        <div class="indice-title">Artefacts Visuels GAN</div>
+        <div class="indice-desc">
+          {% if d.artefacts_visuels %}
+            Incohérences texture / flou GAN — score &gt; 45%
+          {% else %}
+            Aucun artefact de génération IA détecté
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Certification Blockchain ──────────────────────── -->
+<div class="panel" style="margin-bottom:1.5rem;">
+  <div class="panel-title">Certification Blockchain — SHA-256</div>
+  <div class="blockchain-box">
+    ⛓ Ce rapport a été certifié via empreinte cryptographique SHA-256.<br/>
+    Simulation d'inscription sur Blockchain Ethereum (Web3.py).<br/>
+    Chaque rapport est unique et son intégrité est garantie.
+    <span class="hash">{{ sha256 }}</span>
+  </div>
+</div>
+
+<!-- ── Export & Actions ──────────────────────────────── -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+  <a href="{{ url_for('export_json', analyse_id=analyse_id) }}"
+     class="btn-export btn-json">⬡ Exporter JSON</a>
+  <a href="{{ url_for('export_pdf', analyse_id=analyse_id) }}"
+     class="btn-export btn-pdf">⬡ Exporter PDF</a>
+  <div style="flex:1"></div>
+  <a href="{{ url_for('analyse_video_route') }}" class="btn">▶ Nouvelle Vidéo</a>
+  <a href="{{ url_for('analyse_url_route') }}"   class="btn">⬡ Nouvelle URL</a>
+  <a href="{{ url_for('historique') }}"           class="btn">📋 Historique</a>
+  <a href="{{ url_for('dashboard') }}"            class="btn btn-danger">⌂ Dashboard</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll('.score-fill[data-w]').forEach(el => {
+    const w = parseFloat(el.dataset.w);
+    requestAnimationFrame(() => { el.style.width = Math.min(w, 100) + '%'; });
+  });
+</script>
+{% endblock %}

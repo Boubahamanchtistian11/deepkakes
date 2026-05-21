@@ -1,0 +1,40 @@
+# ── Secrets — NE JAMAIS COMMITTER ─────────────────────
+.env
+
+# ── Base de données SQLite ──────────────────────────────
+sentinelle.db
+
+# ── Vidéos uploadées ────────────────────────────────────
+static/uploads/*
+!static/uploads/.gitkeep
+
+# ── Modèle IA (trop lourd pour Git) ────────────────────
+*.h5
+*.onnx
+*.pt
+*.pth
+
+# ── Python ─────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Environnement virtuel ───────────────────────────────
+venv/
+.venv/
+env/
+
+# ── IDE ─────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

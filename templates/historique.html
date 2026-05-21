@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}Historique — Sentinelle Numérique{% endblock %}
+
+{% block extra_css %}
+<style>
+  .filter-bar {
+    display: flex; gap: 10px; align-items: center;
+    margin-bottom: 1.5rem; flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 6px 16px;
+    background: var(--bg2); border: 1px solid var(--border);
+    color: var(--text-dim); font-family: var(--mono);
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    border-radius: 4px; cursor: pointer; transition: all .2s;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(0,212,255,0.07);
+  }
+  .filter-btn.danger.active {
+    border-color: var(--danger); color: var(--danger);
+    background: rgba(255,60,90,0.07);
+  }
+  .filter-btn.safe.active {
+    border-color: var(--safe); color: var(--safe);
+    background: rgba(0,255,136,0.05);
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .score-mini {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .score-bar-sm {
+    width: 60px; height: 4px;
+    background: var(--bg2); border-radius: 2px; overflow: hidden;
+  }
+  .score-bar-sm-fill {
+    height: 100%; border-radius: 2px;
+  }
+
+  .type-chip {
+    font-family: var(--mono); font-size: 10px;
+    padding: 2px 8px; border-radius: 3px; letter-spacing: 1px;
+  }
+  .type-video { background: rgba(0,136,204,0.15); color: #5bc8f5; border: 1px solid rgba(0,136,204,0.25); }
+  .type-url   { background: rgba(150,80,255,0.12); color: #c09aff; border: 1px solid rgba(150,80,255,0.25); }
+
+  .empty-state {
+    text-align: center; padding: 4rem 2rem;
+    font-family: var(--mono); font-size: 13px; color: var(--text-dim);
+  }
+  .empty-state .big { font-size: 40px; margin-bottom: 12px; display: block; }
+
+  tr.row-fake td:first-child { border-left: 2px solid var(--danger); }
+  tr.row-real td:first-child { border-left: 2px solid var(--safe); }
+
+  .stats-mini {
+    display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+  }
+  .stats-mini-item {
+    padding: 10px 18px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; text-align: center; min-width: 100px;
+  }
+  .stats-mini-item .val {
+    font-family: var(--display); font-weight: 800;
+    font-size: 22px; color: var(--accent);
+  }
+  .stats-mini-item .lbl {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-dim); letter-spacing: 1px;
+    text-transform: uppercase; margin-top: 2px;
+  }
+  .stats-mini-item.d .val { color: var(--danger); }
+  .stats-mini-item.s .val { color: var(--safe); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><span>Historique</span> des Analyses</h1>
+  <p>// {{ analyses|length }} enregistrement(s) · Base SQLite · Certification SHA-256 active</p>
+</div>
+
+<!-- Mini stats -->
+{% set total = analyses|length %}
+{% set nb_fake = analyses | selectattr(4, 'equalto', 'DEEPFAKE') | list | length %}
+{% set nb_real = total - nb_fake %}
+<div class="stats-mini">
+  <div class="stats-mini-item">
+    <div class="val">{{ total }}</div>
+    <div class="lbl">Total</div>
+  </div>
+  <div class="stats-mini-item d">
+    <div class="val">{{ nb_fake }}</div>
+    <div class="lbl">Deepfakes</div>
+  </div>
+  <div class="stats-mini-item s">
+    <div class="val">{{ nb_real }}</div>
+    <div class="lbl">Authentiques</div>
+  </div>
+  <div class="stats-mini-item">
+    <div class="val">{{ analyses | selectattr(1, 'equalto', 'VIDEO') | list | length }}</div>
+    <div class="lbl">Vidéos</div>
+  </div>
+  <div class="stats-mini-item">
+    <div class="val">{{ analyses | selectattr(1, 'equalto', 'URL') | list | length }}</div>
+    <div class="lbl">URL</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="filterTable('all', this)">Tous</button>
+  <button class="filter-btn danger" onclick="filterTable('DEEPFAKE', this)">⚠ Deepfakes</button>
+  <button class="filter-btn safe"   onclick="filterTable('AUTHENTIQUE', this)">✓ Authentiques</button>
+  <button class="filter-btn"        onclick="filterTable('VIDEO', this)">📁 Vidéo</button>
+  <button class="filter-btn"        onclick="filterTable('URL', this)">🔗 URL</button>
+
+  <input type="text" class="form-control" id="search-input"
+         style="max-width:240px;padding:6px 12px;font-size:12px;"
+         placeholder="Rechercher une source..."
+         oninput="searchTable(this.value)"/>
+</div>
+
+<div class="panel">
+  {% if analyses %}
+  <div class="table-wrap">
+    <table id="hist-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Type</th>
+          <th>Source</th>
+          <th>Score</th>
+          <th>Verdict</th>
+          <th>SHA-256</th>
+          <th>Date</th>
+          <th>Export</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in analyses %}
+        {% set is_fake = row[4] == 'DEEPFAKE' %}
+        {% set spct = (row[3] * 100) | round(1) if row[3] else 0 %}
+        {# row: 0=id 1=type 2=source 3=score 4=verdict 5=sha256 6=created_at #}
+        <tr class="{% if is_fake %}row-fake{% else %}row-real{% endif %}"
+            data-verdict="{{ row[4] }}" data-type="{{ row[1] }}"
+            data-source="{{ row[2] | lower }}">
+          <td style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">#{{ row[0] }}</td>
+          <td>
+            <span class="type-chip {% if row[1]=='VIDEO' %}type-video{% else %}type-url{% endif %}">
+              {{ row[1] }}
+            </span>
+          </td>
+          <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">{{ row[2] }}</span>
+          </td>
+          <td>
+            <div class="score-mini">
+              <span style="font-family:var(--mono);font-size:12px;color:{% if is_fake %}var(--danger){% else %}var(--safe){% endif %}">
+                {{ spct }}%
+              </span>
+              <div class="score-bar-sm">
+                <div class="score-bar-sm-fill"
+                     style="width:{{ spct }}%;background:{% if is_fake %}var(--danger){% else %}var(--safe){% endif %}">
+                </div>
+              </div>
+            </div>
+          </td>
+          <td>
+            {% if is_fake %}
+              <span class="badge badge-fake">DEEPFAKE</span>
+            {% else %}
+              <span class="badge badge-real">AUTHENTIQUE</span>
+            {% endif %}
+          </td>
+          <td style="font-family:var(--mono);font-size:10px;color:var(--text-dim);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+              title="{{ row[5] }}">
+            {% if row[5] %}
+              <span style="color:rgba(0,212,255,.6);">⛓</span> {{ row[5][:12] }}…
+            {% else %}
+              <span style="color:var(--text-dim);">—</span>
+            {% endif %}
+          </td>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--text-dim);white-space:nowrap;">
+            {{ row[6] }}
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              <a href="{{ url_for('export_json', analyse_id=row[0]) }}"
+                 title="Exporter JSON"
+                 style="font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:3px;
+                        background:rgba(0,204,102,.1);border:1px solid rgba(0,204,102,.3);
+                        color:#00cc66;text-decoration:none;white-space:nowrap;">JSON</a>
+              <a href="{{ url_for('export_pdf', analyse_id=row[0]) }}"
+                 title="Exporter PDF"
+                 style="font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:3px;
+                        background:rgba(255,102,51,.1);border:1px solid rgba(255,102,51,.3);
+                        color:#ff6633;text-decoration:none;white-space:nowrap;">PDF</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="big">📭</span>
+    Aucune analyse enregistrée pour le moment.<br/>
+    <a href="{{ url_for('analyse_video_route') }}" class="btn" style="margin-top:1rem;display:inline-flex;">
+      ▶ Lancer une première analyse
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<div style="margin-top:1.5rem;display:flex;gap:10px;">
+  <a href="{{ url_for('analyse_video_route') }}" class="btn">▶ Nouvelle Analyse Vidéo</a>
+  <a href="{{ url_for('analyse_url_route') }}" class="btn">⬡ Nouvelle Analyse URL</a>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-danger">⌂ Dashboard</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function filterTable(key, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('#hist-table tbody tr').forEach(row => {
+      if (key === 'all') { row.style.display = ''; return; }
+      const match = row.dataset.verdict === key || row.dataset.type === key;
+      row.style.display = match ? '' : 'none';
+    });
+  }
+
+  function searchTable(val) {
+    const q = val.toLowerCase();
+    document.querySelectorAll('#hist-table tbody tr').forEach(row => {
+      row.style.display = row.dataset.source.includes(q) ? '' : 'none';
+    });
+  }
+</script>
+{% endblock %}
