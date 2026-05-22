@@ -30,10 +30,6 @@ HF_MODEL_URL = (
     "https://router.huggingface.co/hf-inference/models/"
     "dima806/deepfake_vs_real_image_detection"
 )
-HF_MODEL_URL = (
-    "https://api-inference.huggingface.co/models/"
-    "dima806/deepfake_vs_real_image_detection"
-)
 
 # ─────────────────────────────────────────────────────────────
 # BASE DE DONNÉES
@@ -541,7 +537,22 @@ def api_historique():
                      "sha256": r[5], "date": r[6]} for r in rows])
 
 @app.route("/api/rapport/<int:analyse_id>")
-───────────────────────────────────────
+def api_rapport(analyse_id):
+    rapport = build_rapport_json(analyse_id)
+    if not rapport:
+        return jsonify({"error": "Introuvable"}), 404
+    return jsonify(rapport)
+
+# ─────────────────────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────────────────────
+def allowed_file(filename):
+    return ("." in filename and
+            filename.rsplit(".", 1)[1].lower() in ALLOWED_EXT)
+
+# ─────────────────────────────────────────────────────────────
+# LANCEMENT
+# ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     init_db()
     se_ok = bool(SIGHTENGINE_USER and SIGHTENGINE_SECRET)
