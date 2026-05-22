@@ -2,6 +2,7 @@ import os, cv2, json, time, hashlib, sqlite3, datetime, subprocess
 import numpy as np
 import requests
 from io import BytesIO
+from urllib.parse import urlparse
 from flask import (Flask, render_template, request,
                    redirect, url_for, session, jsonify, send_file)
 from werkzeug.utils import secure_filename
@@ -10,15 +11,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ─────────────────────────────────────────────────────────────
-# CONFIGURATION
+# CONFIGURATIONS
 # ─────────────────────────────────────────────────────────────
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "sentinelle_supptic_2025")
+
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+if not SECRET_KEY:
+    import secrets
+    SECRET_KEY = secrets.token_hex(32)
+    print("[AVERTISSEMENT] SECRET_KEY non défini dans .env — clé aléatoire générée.")
+app.secret_key = SECRET_KEY
 
 UPLOAD_FOLDER = "static/uploads"
 ALLOWED_EXT   = {"mp4", "avi", "mov", "mkv"}
 DB_PATH       = "sentinelle.db"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["UPLOAD_FOLDER"]    = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # CORRECTION : limite 500 MB
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Clés API (depuis .env)
@@ -30,6 +38,17 @@ HF_MODEL_URL = (
     "https://api-inference.huggingface.co/models/"
     "dima806/deepfake_vs_real_image_detection"
 )
+
+# Domaines autorisés pour le téléchargement via URL
+ALLOWED_URL_DOMAINS = {
+    "youtube.com", "www.youtube.com", "youtu.be",
+    "vimeo.com", "www.vimeo.com",
+    "dailymotion.com", "www.dailymotion.com",
+    "facebook.com", "www.facebook.com",
+    "twitter.com", "www.twitter.com", "x.com",
+    "instagram.com", "www.instagram.com",
+    "tiktok.com", "www.tiktok.com",
+}
 
 # ─────────────────────────────────────────────────────────────
 # BASE DE DONNÉES
@@ -51,6 +70,11 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
+# CORRECTION : init_db() appelé au démarrage de l'app,
+# pas seulement dans __main__ (compatible Gunicorn/uWSGI)
+with app.app_context():
+    init_db()
 
 def save_analyse(type_, source, score, verdict, details="{}", sha256=""):
     conn = sqlite3.connect(DB_PATH)
@@ -123,6 +147,7 @@ def analyse_sightengine_image(image_bytes: bytes) -> dict:
             },
             timeout=15,
         )
+        r.raise_for_status()  # CORRECTION : lever une exception si HTTP erreur
         data = r.json()
         score = data.get("deepfake", {}).get("score", 0.0)
         return {"deepfake": float(score), "simulated": False,
@@ -147,18 +172,34 @@ def analyse_huggingface_image(image_bytes: bytes) -> dict:
         headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
         r = requests.post(HF_MODEL_URL, headers=headers,
                           data=image_bytes, timeout=20)
+
+        # CORRECTION : vérifier le code HTTP avant de parser
+        if r.status_code != 200:
+            print(f"[HuggingFace] HTTP {r.status_code} — bascule en simulation")
+            return {"deepfake": float(np.random.beta(2, 5)),
+                    "simulated": True, "source": "simulation_fallback"}
+
         results = r.json()
+
+        # CORRECTION : le modèle retourne "FAKE"/"REAL" —
+        # calculer le score deepfake dans les deux cas
         if isinstance(results, list):
             for item in results:
-                if item.get("label", "").lower() in ("fake", "deepfake"):
+                label = item.get("label", "").upper()
+                if label in ("FAKE", "DEEPFAKE"):
                     return {"deepfake": float(item["score"]),
                             "simulated": False, "source": "huggingface"}
+                if label in ("REAL", "AUTHENTIC"):
+                    # CORRECTION : score deepfake = 1 - score_real
+                    return {"deepfake": float(1.0 - item["score"]),
+                            "simulated": False, "source": "huggingface"}
+
         return {"deepfake": 0.1, "simulated": False, "source": "huggingface"}
     except Exception as e:
         print(f"[HuggingFace] Erreur : {e}")
         return {"deepfake": float(np.random.beta(2, 5)),
                 "simulated": True, "source": "simulation_fallback"}
-
+Q
 # ─────────────────────────────────────────────────────────────
 # MODULE 3 — PIPELINE D'ANALYSE VIDÉO
 # ─────────────────────────────────────────────────────────────
@@ -212,11 +253,13 @@ def analyse_video(video_path: str) -> dict:
     score_max    = float(max(max(scores_se),
                              max(scores_hf) if scores_hf else 0))
     fake_frames  = sum(1 for s in scores_se if s > 0.5)
+
+    # CORRECTION : pct_fake calculé après la vérification scores_se non vide
     pct_fake     = round((fake_frames / len(scores_se)) * 100, 2)
     verdict      = "DEEPFAKE" if score_global > 0.5 else "AUTHENTIQUE"
 
+    # CORRECTION : score_global retiré de details (déjà retourné au niveau supérieur)
     details = {
-        "score_global":      score_global,
         "score_sightengine": round(avg_se, 4),
         "score_huggingface": round(avg_hf, 4),
         "score_max_detecte": round(score_max, 4),
@@ -275,9 +318,6 @@ def build_rapport_pdf(analyse_id: int) -> BytesIO:
     rapport = build_rapport_json(analyse_id)
     buf = BytesIO()
 
-    # ── Correctif Unicode → Latin-1 ──────────────────────────────
-    # Helvetica (police core fpdf2) ne supporte que Latin-1.
-    # On remplace les caractères hors plage avant tout appel fpdf2.
     REPLACEMENTS = {
         "\u2014": "-",   # em dash  —
         "\u2013": "-",   # en dash  –
@@ -314,10 +354,8 @@ def build_rapport_pdf(analyse_id: int) -> BytesIO:
     }
 
     def safe(text: str) -> str:
-        """Remplace les caractères non-Latin-1 pour fpdf2/Helvetica."""
         for src, dst in REPLACEMENTS.items():
             text = text.replace(src, dst)
-        # Supprime tout caractère restant hors Latin-1
         return text.encode("latin-1", errors="replace").decode("latin-1")
 
     try:
@@ -375,7 +413,7 @@ def build_rapport_pdf(analyse_id: int) -> BytesIO:
         section("Scores par API")
         row("Sightengine",    f"{round(d.get('score_sightengine',0)*100,1)}%")
         row("HuggingFace",    f"{round(d.get('score_huggingface',0)*100,1)}%")
-        row("Score fusionne", f"{round(d.get('score_global',0)*100,1)}%  (60% SE + 40% HF)")
+        row("Score fusionne", f"{round(rapport['score']*100,1)}%  (60% SE + 40% HF)")
         row("Score max",      f"{round(d.get('score_max_detecte',0)*100,1)}%")
 
         section("Statistiques Video")
@@ -423,7 +461,33 @@ def build_rapport_pdf(analyse_id: int) -> BytesIO:
 # ─────────────────────────────────────────────────────────────
 # TÉLÉCHARGEMENT URL (yt-dlp)
 # ─────────────────────────────────────────────────────────────
+def valider_url(url: str) -> tuple:
+    """
+    CORRECTION : Validation de l'URL avant de la passer à yt-dlp.
+    Accepte uniquement https:// et les domaines de la liste blanche.
+    Retourne (True, None) si valide, (False, message_erreur) sinon.
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme != "https":
+            return False, "Seules les URLs HTTPS sont acceptées."
+        domain = parsed.netloc.lower()
+        if domain not in ALLOWED_URL_DOMAINS:
+            return False, (
+                f"Domaine non autorisé : {domain}. "
+                "Plateformes supportées : YouTube, Vimeo, Dailymotion, "
+                "Facebook, Twitter/X, Instagram, TikTok."
+            )
+        return True, None
+    except Exception:
+        return False, "URL invalide."
+
 def telecharger_video_url(url: str):
+    # CORRECTION : validation SSRF avant tout appel yt-dlp
+    valide, err = valider_url(url)
+    if not valide:
+        return None, err
+
     timestamp   = int(time.time())
     output_path = os.path.join(UPLOAD_FOLDER, f"video_url_{timestamp}.mp4")
     cmd = ["python", "-m", "yt_dlp", "--quiet", "--no-warnings",
@@ -439,14 +503,19 @@ def telecharger_video_url(url: str):
         return None, "yt-dlp non installé. Lancez : pip install yt-dlp"
 
 # ─────────────────────────────────────────────────────────────
-# AUTH
+# HELPERS
+# ─────────────────────────────────────────────────────────────
+def allowed_file(filename):
+    return ("." in filename and
+            filename.rsplit(".", 1)[1].lower() in ALLOWED_EXT)
+
+# ─────────────────────────────────────────────────────────────
+# ROUTES — Pages
 # ─────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
     return redirect(url_for("dashboard"))
-# ─────────────────────────────────────────────────────────────
-# ROUTES — Pages
-# ─────────────────────────────────────────────────────────────
+
 @app.route("/dashboard")
 def dashboard():
     return render_template("dashboard.html",
@@ -482,19 +551,29 @@ def analyse_url_route():
     url = request.form.get("url", "").strip()
     if not url:
         return render_template("analyse_url.html", error="URL vide.")
+
     filepath, err = telecharger_video_url(url)
     if err:
         return render_template("analyse_url.html", error=err)
-    resultat = analyse_video(filepath)
-    if "error" in resultat:
-        return render_template("analyse_url.html", error=resultat["error"])
-    sha = certifier_rapport({**resultat, "source": url,
-                             "ts": datetime.datetime.now().isoformat()})
-    aid = save_analyse("URL", url, resultat["score"],
-                       resultat["verdict"], json.dumps(resultat["details"]), sha)
-    return render_template("resultat.html", type_analyse="URL",
-                           source=url, resultat=resultat,
-                           sha256=sha, analyse_id=aid)
+
+    try:
+        resultat = analyse_video(filepath)
+        if "error" in resultat:
+            return render_template("analyse_url.html", error=resultat["error"])
+        sha = certifier_rapport({**resultat, "source": url,
+                                 "ts": datetime.datetime.now().isoformat()})
+        aid = save_analyse("URL", url, resultat["score"],
+                           resultat["verdict"], json.dumps(resultat["details"]), sha)
+        return render_template("resultat.html", type_analyse="URL",
+                               source=url, resultat=resultat,
+                               sha256=sha, analyse_id=aid)
+    finally:
+        # CORRECTION : suppression de la vidéo temporaire dans tous les cas
+        if filepath and os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+            except OSError as e:
+                print(f"[Nettoyage] Impossible de supprimer {filepath} : {e}")
 
 @app.route("/historique")
 def historique():
@@ -532,6 +611,8 @@ def api_stats():
 @app.route("/api/historique")
 def api_historique():
     rows = get_historique(20)
+    # CORRECTION : indices corrects (get_historique retourne 7 colonnes)
+    # (id, type, source, score, verdict, sha256_hash, created_at)
     return jsonify([{"id": r[0], "type": r[1], "source": r[2],
                      "score": r[3], "verdict": r[4],
                      "sha256": r[5], "date": r[6]} for r in rows])
@@ -544,17 +625,9 @@ def api_rapport(analyse_id):
     return jsonify(rapport)
 
 # ─────────────────────────────────────────────────────────────
-# HELPERS
-# ─────────────────────────────────────────────────────────────
-def allowed_file(filename):
-    return ("." in filename and
-            filename.rsplit(".", 1)[1].lower() in ALLOWED_EXT)
-
-# ─────────────────────────────────────────────────────────────
 # LANCEMENT
 # ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    init_db()
     se_ok = bool(SIGHTENGINE_USER and SIGHTENGINE_SECRET)
     hf_ok = bool(HF_API_TOKEN)
     print("=" * 62)
@@ -566,12 +639,13 @@ if __name__ == "__main__":
     print(f"  SHA-256 Blockchain : ✅ Active")
     print(f"  Export PDF/JSON    : ✅ Activé")
     print(f"  Base de données    : {DB_PATH}")
-    print(f"  URL : http://127.0.0.1:5000   Login : admin / admin")
+    print(f"  URL : http://127.0.0.1:5000")
     print("=" * 62)
     if not se_ok or not hf_ok:
         print("  ⚙  Créez un fichier .env :")
         print("     SIGHTENGINE_USER=your_user")
         print("     SIGHTENGINE_SECRET=your_secret")
         print("     HF_API_TOKEN=hf_xxxxxxxxxxxx")
+        print("     SECRET_KEY=une_cle_secrete_longue_et_aleatoire")
         print("=" * 62)
     app.run(debug=True, host="0.0.0.0", port=5000)
