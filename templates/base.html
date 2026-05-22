@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{% block title %}Sentinelle Numérique{% endblock %}</title>
+  <title>{% block title %}DeepFake Video Detection{% endblock %}</title>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet"/>
   <style>
     :root {
@@ -335,14 +335,12 @@
   {% block extra_css %}{% endblock %}
 </head>
 <body>
-
-{% if session.user %}
 <nav>
   <a href="{{ url_for('dashboard') }}" class="nav-brand">
-    <div class="logo-icon">SN</div>
+    <div class="logo-icon">DFD</div>
     <div>
-      <span class="brand-text">SENTINELLE</span>
-      <span class="brand-sub">NUMÉRIQUE · DEEPFAKE DÉTECTION</span>
+      <span class="brand-text">DEEPFAKE</span>
+      <span class="brand-sub">DEEPFAKE DÉTECTION</span>
     </div>
   </a>
 
@@ -356,10 +354,9 @@
   <div class="nav-user">
     <div class="dot"></div>
     <span>{{ session.user }}</span>
-    <a href="{{ url_for('logout') }}" class="btn-logout">[ EXIT ]</a>
   </div>
 </nav>
-{% endif %}
+
 
 <main>
   {% block content %}{% endblock %}

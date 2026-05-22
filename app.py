@@ -1,18 +1,3 @@
-"""
-╔══════════════════════════════════════════════════════════════════╗
-║   SENTINELLE NUMÉRIQUE — Groupe 2 · Deepfake Vidéo              ║
-║   SUP'PTIC · ITT3 IR Alternance 2025-2026                        ║
-║                                                                  ║
-║   Conforme au cahier des charges Livrable 1 :                    ║
-║   ✅ API Sightengine  (deepfake + artefacts visuels)             ║
-║   ✅ API Hugging Face (modèle FaceForensics++)                   ║
-║   ✅ Analyse frame-à-frame OpenCV                                ║
-║   ✅ Certification SHA-256 (simulation Blockchain)               ║
-║   ✅ Export JSON + PDF du rapport                                 ║
-║   ✅ Historique SQLite + Dashboard statistiques                  ║
-╚══════════════════════════════════════════════════════════════════╝
-"""
-
 import os, cv2, json, time, hashlib, sqlite3, datetime, subprocess
 import numpy as np
 import requests
@@ -456,43 +441,19 @@ def telecharger_video_url(url: str):
 # ─────────────────────────────────────────────────────────────
 # AUTH
 # ─────────────────────────────────────────────────────────────
-def login_required(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if "user" not in session:
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-    return decorated
-
-@app.route("/", methods=["GET", "POST"])
-def login():
-    error = None
-    if request.method == "POST":
-        if (request.form.get("username") == "admin" and
-                request.form.get("password") == "admin"):
-            session["user"] = request.form["username"]
-            return redirect(url_for("dashboard"))
-        error = "Identifiants incorrects."
-    return render_template("login.html", error=error)
-
-@app.route("/logout")
-def logout():
-    session.pop("user", None)
-    return redirect(url_for("login"))
-
+@app.route("/")
+def index():
+    return redirect(url_for("dashboard"))
 # ─────────────────────────────────────────────────────────────
 # ROUTES — Pages
 # ─────────────────────────────────────────────────────────────
 @app.route("/dashboard")
-@login_required
 def dashboard():
     return render_template("dashboard.html",
                            stats=get_stats(),
                            historique=get_historique(5))
 
 @app.route("/analyse-video", methods=["GET", "POST"])
-@login_required
 def analyse_video_route():
     if request.method == "GET":
         return render_template("analyse_video.html")
@@ -515,7 +476,6 @@ def analyse_video_route():
                            sha256=sha, analyse_id=aid)
 
 @app.route("/analyse-url", methods=["GET", "POST"])
-@login_required
 def analyse_url_route():
     if request.method == "GET":
         return render_template("analyse_url.html")
@@ -537,7 +497,6 @@ def analyse_url_route():
                            sha256=sha, analyse_id=aid)
 
 @app.route("/historique")
-@login_required
 def historique():
     return render_template("historique.html", analyses=get_historique(50))
 
@@ -545,7 +504,6 @@ def historique():
 # ROUTES — Export rapport
 # ─────────────────────────────────────────────────────────────
 @app.route("/export/json/<int:analyse_id>")
-@login_required
 def export_json(analyse_id):
     rapport = build_rapport_json(analyse_id)
     if not rapport:
@@ -558,7 +516,6 @@ def export_json(analyse_id):
                      download_name=f"rapport_{analyse_id}.json")
 
 @app.route("/export/pdf/<int:analyse_id>")
-@login_required
 def export_pdf(analyse_id):
     buf = build_rapport_pdf(analyse_id)
     return send_file(buf, mimetype="application/pdf",
@@ -569,12 +526,10 @@ def export_pdf(analyse_id):
 # ROUTES — API REST JSON
 # ─────────────────────────────────────────────────────────────
 @app.route("/api/stats")
-@login_required
 def api_stats():
     return jsonify(get_stats())
 
 @app.route("/api/historique")
-@login_required
 def api_historique():
     rows = get_historique(20)
     return jsonify([{"id": r[0], "type": r[1], "source": r[2],
@@ -582,7 +537,6 @@ def api_historique():
                      "sha256": r[5], "date": r[6]} for r in rows])
 
 @app.route("/api/rapport/<int:analyse_id>")
-@login_required
 def api_rapport(analyse_id):
     rapport = build_rapport_json(analyse_id)
     if not rapport:

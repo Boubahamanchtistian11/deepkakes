@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Analyse URL — Sentinelle Numérique{% endblock %}
+{% block title %}Analyse URL — Deepfake{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -63,7 +63,7 @@
 {% block content %}
 <div class="page-header">
   <h1>Analyse <span>URL</span></h1>
-  <p>// Téléchargement et analyse de vidéos depuis TikTok, YouTube Shorts, Instagram Reels</p>
+  <p>Téléchargement et analyse de vidéos depuis TikTok, YouTube Shorts, Instagram Reels</p>
 </div>
 
 <div class="grid-2">
@@ -94,7 +94,7 @@
 
       <div class="warning-box">
         ⚠ Assurez-vous que yt-dlp est installé :<br/>
-        <code style="color:var(--accent);">pip install yt-dlp</code><br/>
+        <code style="color:var(--accent);"></code><br/>
         Le téléchargement peut prendre jusqu'à 60 secondes selon la connexion.
       </div>
 
@@ -123,25 +123,6 @@
   </div>
 
   <div style="display:flex;flex-direction:column;gap:1.5rem;">
-    <div class="panel">
-      <div class="panel-title">Processus d'Analyse URL</div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        {% for step, title, desc in [
-          ("01", "Téléchargement", "yt-dlp récupère la vidéo depuis la plateforme en format MP4."),
-          ("02", "Stockage temporaire", "La vidéo est sauvegardée localement dans static/uploads/."),
-          ("03", "Analyse frame-à-frame", "Le moteur IA analyse chaque frame selon les 3 indices deepfake."),
-          ("04", "Rapport & Historique", "Le résultat est enregistré dans la base SQLite et affiché.")
-        ] %}
-        <div style="display:flex;gap:12px;align-items:flex-start;">
-          <div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:bold;flex-shrink:0;padding-top:2px;">{{ step }}</div>
-          <div>
-            <div style="font-family:var(--sans);font-weight:600;font-size:13px;color:var(--text);">{{ title }}</div>
-            <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:2px;">{{ desc }}</div>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
 
     <div class="panel">
       <div class="panel-title">Exemples d'URL</div>
