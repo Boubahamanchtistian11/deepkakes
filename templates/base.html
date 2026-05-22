@@ -296,6 +296,68 @@
     @media (max-width: 768px) {
       .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
       main { padding: 1rem; }
+
+      /* Navbar mobile */
+      nav {
+        height: auto;
+        flex-wrap: wrap;
+        padding: 10px 1rem;
+        gap: 8px;
+      }
+      .nav-brand .brand-text { font-size: 13px; }
+      .nav-brand .brand-sub  { display: none; }
+      .nav-links {
+        order: 3;
+        width: 100%;
+        gap: 2px;
+        flex-wrap: wrap;
+      }
+      .nav-links a {
+        font-size: 11px;
+        padding: 5px 10px;
+      }
+      .nav-user { font-size: 11px; }
+
+      /* Hero banner mobile */
+      .hero-banner {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1.2rem;
+      }
+      .hero-banner::after { display: none; }
+      .hero-actions {
+        width: 100%;
+        flex-direction: column;
+      }
+      .hero-actions .btn { width: 100%; justify-content: center; }
+
+      /* Verdict banner mobile */
+      .verdict-banner {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1.2rem;
+      }
+      .gauge-circle { width: 80px; height: 80px; }
+      .gauge-inner  { width: 58px; height: 58px; font-size: 15px; }
+      .verdict-text h2 { font-size: 20px; }
+
+      /* Stats mini mobile */
+      .stats-mini { gap: .6rem; }
+      .stats-mini-item { min-width: 70px; padding: 8px 10px; }
+      .stats-mini-item .val { font-size: 18px; }
+
+      /* Filter bar mobile */
+      .filter-bar { gap: 6px; }
+      .filter-btn { padding: 5px 10px; font-size: 10px; }
+
+      /* Page header mobile */
+      .page-header h1 { font-size: 20px; }
+
+      /* Buttons mobile */
+      .btn { font-size: 12px; padding: 9px 16px; }
+
+      /* Panel mobile */
+      .panel { padding: 1rem; }
     }
 
     /* ── STAT CARD ───────────────────────────────────── */
