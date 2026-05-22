@@ -27,7 +27,7 @@ SIGHTENGINE_SECRET = os.getenv("SIGHTENGINE_SECRET", "")
 HF_API_TOKEN       = os.getenv("HF_API_TOKEN",       "")
 
 HF_MODEL_URL = (
-    "https://api-inference.huggingface.co/models/"
+    "https://router.huggingface.co/hf-inference/models/"
     "dima806/deepfake_vs_real_image_detection"
 )
 
